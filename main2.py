@@ -183,7 +183,9 @@ class SceneObject:
         pass
 
     def recalculate_transform_matrix(self):
-        self.transform_matrix = Mat4.create_rotation(self.rotation) * Mat4.create_scale(self.scale)
+        self.transform_matrix = Mat4.create_translation(self.position) * \
+                                Mat4.create_rotation(self.rotation) * \
+                                Mat4.create_scale(self.scale)
 
 
 class CubeObject(SceneObject):
@@ -349,12 +351,14 @@ class Program:
         pass
 
     def update(self, delta_time, total_time):
+        self.cube.position = Vec3(0, 0, math.sin(total_time * 0.005))
         self.cube.rotation = Vec3(0, math.radians(total_time * 0.05), math.radians(10))
+        self.cube.scale = Vec3(0.4, math.fabs(math.sin(total_time * 0.004) * 0.4) + 0.2, 0.4)
         self.cube.dirty_transform_matrix = True
 
     def load_scene(self):
         self.cube = CubeObject()
-        self.cube.scale = Vec3(0.5, 0.5, 0.5)
+        self.cube.scale = Vec3(0.4, 0.4, 0.4)
         self.cube.rotation = Vec3(math.radians(1), 0, 0)
         self.cube.dirty_transform_matrix = True
 
