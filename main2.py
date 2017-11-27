@@ -6,6 +6,16 @@ import math
 import time
 
 
+class MathUtils:
+    @staticmethod
+    def clamp(min, max, v):
+        return min(max, max(min, v))
+
+    @staticmethod
+    def lerp(min, max, f):
+        return min + (max - min) * MathUtils.clamp(0, 1, f)
+
+
 class Vec3:
     """
     Three dimensional vector class represented by components x, y and z.
@@ -244,23 +254,26 @@ class CubeObject(SceneObject):
         self.combined_matrix = camera.projection_matrix * camera.view_matrix * self.transform_matrix
 
 
-# class LinePool:
-#     def __init__(self):
-#         self.available = []
-#         self.used = []
-#
-#     def acquire(self):
-#         pass
-#
-#     def release(self, line):
+class CheckersBoard(SceneObject):
+    def __init__(self):
+        SceneObject.__init__(self)
+
+        self.A = Vec3(-1, 0, -1)
+        self.B = Vec3(-1, 0, 1)
+        self.C = Vec3(1, 0, 1)
+        self.D = Vec3(1, 0, -1)
+        self.tiles = 8
+
+    def draw(self, g):
+        pass
 
 
 class Graphics:
-    def __init__(self, canvas):
+    def __init__(self, canvas, width=720, height=720):
         self.c = canvas
-        self.width_half = 720 / 2
-        self.height_half = 720 / 2
-        print(f'Initialized graphics instance on canvas with half size {self.width_half}x{self.height_half} px')
+        self.width_half = width / 2
+        self.height_half = height / 2
+        print(f'Initialized graphics instance on canvas with half size {width}x{height} px')
 
     def clear(self):
         self.c.delete('all')
@@ -301,7 +314,8 @@ class Scene:
 
 
 class Program:
-    def __init__(self):
+    def __init__(self, window_size=720):
+        self.window_size = window_size
         self.canvas = None
         self.g = None
         self.total_time = 0
@@ -313,11 +327,11 @@ class Program:
 
     def load(self):
         print('Creating canvas...')
-        self.canvas = tkinter.Canvas(width=720, height=720)
+        self.canvas = tkinter.Canvas(width=self.window_size, height=self.window_size)
         self.canvas.pack()
 
         print('Creating graphics...')
-        self.g = Graphics(self.canvas)
+        self.g = Graphics(self.canvas, width=self.window_size, height=self.window_size)
 
         print('Creating scene...')
         self.load_scene()
