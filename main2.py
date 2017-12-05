@@ -3,13 +3,11 @@ import random
 import json
 import math
 
-import time
-
 
 class MathUtils:
     @staticmethod
-    def clamp(min, max, v):
-        return min(max, max(min, v))
+    def clamp(vmin, vmax, v):
+        return min(vmax, max(vmin, v))
 
     @staticmethod
     def lerp(min, max, f):
@@ -29,8 +27,14 @@ class Vec3:
     def __str__(self):
         return f'Vec3({self.x}, {self.y}, {self.z})'
 
+    def __repr__(self):
+        return f'({self.x:5}, {self.z:5})'
+
     def __add__(self, other):
         return Vec3(self.x + other.x, self.y + other.y, self.z + other.z)
+
+    def __sub__(self, other):
+        return Vec3(self.x - other.x, self.y - other.y, self.z - other.z)
 
     def __mul__(self, other):
         if isinstance(other, Vec3):
@@ -175,6 +179,10 @@ class Camera:
         self.projection_matrix = Mat4()
         self.dirty_view_matrix = True
 
+    def update(self, delta_time, total_time):
+        # self.view_matrix = Mat4.create_rotation(Vec3(0, 0, math.radians(90)))
+        pass
+
 
 class SceneObject:
     def __init__(self):
@@ -264,6 +272,71 @@ class CheckersBoard(SceneObject):
         self.D = Vec3(1, 0, -1)
         self.tiles = 8
 
+        self.black_rects = []
+
+        # perform 2d lerp
+        vertices = []
+        for i in range(0, self.tiles + 1):
+            fx = i / self.tiles
+            vx_start = MathUtils.lerp(self.A, self.D, fx)
+            vx_end = MathUtils.lerp(self.B, self.C, fx)
+            for j in range(0, self.tiles + 1):
+                fz = j / self.tiles
+                vertices.append(MathUtils.lerp(vx_start, vx_end, fz))
+                print(MathUtils.lerp(vx_start, vx_end, fz).__repr__(), end='')
+            print()
+
+        print('len(vertices)=', len(vertices))
+
+        # emit black rects
+        for i in range(0, self.tiles * (self.tiles + 1)):
+            if i % 2 == 0 and (i + 1) % (self.tiles + 1) != 0:
+                a = vertices[i]
+                b = vertices[i + 1]
+                c = vertices[i + 1 + 1 + self.tiles]
+                d = vertices[i + 1 + self.tiles]
+
+                self.black_rects.append((a, b, c, d))
+
+        print()
+
+        self.combined_matrix = Mat4()
+
+    def draw(self, g):
+        A = self.combined_matrix.mul_point(self.A)
+        B = self.combined_matrix.mul_point(self.B)
+        C = self.combined_matrix.mul_point(self.C)
+        D = self.combined_matrix.mul_point(self.D)
+
+        g.polygon(A, B, C, D, 'white')
+
+        for rect in self.black_rects:
+            E = self.combined_matrix.mul_point(rect[0])
+            F = self.combined_matrix.mul_point(rect[1])
+            G = self.combined_matrix.mul_point(rect[2])
+            H = self.combined_matrix.mul_point(rect[3])
+
+            g.polygon(E, F, G, H, 'black')
+
+    def update(self, camera, delta_time, total_time):
+        super().update(camera, delta_time, total_time)
+
+        self.combined_matrix = camera.projection_matrix * camera.view_matrix * self.transform_matrix
+
+
+class Pawn(SceneObject):
+    def __init__(self):
+        SceneObject.__init__(self)
+
+        self.size = 0.08
+
+        self.combined_matrix = Mat4()
+
+    def update(self, camera, delta_time, total_time):
+        super().update(camera, delta_time, total_time)
+
+        self.combined_matrix = camera.projection_matrix * camera.view_matrix * self.transform_matrix
+
     def draw(self, g):
         pass
 
@@ -275,22 +348,33 @@ class Graphics:
         self.height_half = height / 2
         print(f'Initialized graphics instance on canvas with half size {width}x{height} px')
 
+    def point_to_coords(self, p):
+        return (p.x * self.width_half) + self.width_half, (p.y * self.height_half) + self.height_half
+
     def clear(self):
         self.c.delete('all')
 
     def dbg_point(self, point, name, color='blue'):
-        p = ((point.x * self.width_half) + self.width_half, (point.y * self.height_half) + self.height_half)
+        p = self.point_to_coords(point)
 
         self.c.create_oval(p[0] - 8, p[1] - 8, p[0] + 8, p[1] + 8, fill=color)
         self.c.create_text(p[0], p[1] - 16, text=name, font=('Arial', '12', 'bold'), fill='black')
 
     def line(self, point_a, point_b, color='black'):
-        p1 = ((point_a.x * self.width_half) + self.width_half, (point_a.y * self.height_half) + self.height_half)
-        p2 = ((point_b.x * self.width_half) + self.width_half, (point_b.y * self.height_half) + self.height_half)
+        p1 = self.point_to_coords(point_a)
+        p2 = self.point_to_coords(point_b)
 
         # print('line', 'from=', p1, 'to=', p2)
 
         self.c.create_line(p1, p2, fill=color)
+
+    def polygon(self, point_a, point_b, point_c, point_d, fill='white', outline=''):
+        p1 = self.point_to_coords(point_a)
+        p2 = self.point_to_coords(point_b)
+        p3 = self.point_to_coords(point_c)
+        p4 = self.point_to_coords(point_d)
+
+        self.c.create_polygon(p1, p2, p3, p4, fill=fill, outline=outline)
 
 
 class Scene:
@@ -305,6 +389,8 @@ class Scene:
         self.objects.remove(obj)
 
     def update_all(self, delta_time, total_time):
+        self.camera.update(delta_time, total_time)
+
         for obj in self.objects:
             obj.update(self.camera, delta_time, total_time)
 
@@ -314,20 +400,21 @@ class Scene:
 
 
 class Program:
-    def __init__(self, window_size=720):
+    def __init__(self, window_size=900):
         self.window_size = window_size
         self.canvas = None
         self.g = None
+        self.frame_time = 1 / 60
         self.total_time = 0
         self.scene = Scene()
 
         self.load()
-        self.loop()
-        self.clean_up()
+        self.start_loop()
 
     def load(self):
         print('Creating canvas...')
         self.canvas = tkinter.Canvas(width=self.window_size, height=self.window_size)
+        self.canvas.configure(background='#002259')
         self.canvas.pack()
 
         print('Creating graphics...')
@@ -337,38 +424,36 @@ class Program:
         self.load_scene()
 
     def loop(self):
-        delta = 1 / 60
-        while True:
-            start = time.clock()
+        delta = self.frame_time
 
-            # clear screen
-            self.g.clear()
+        # clear screen
+        self.g.clear()
 
-            # update world
-            self.scene.update_all(delta, self.total_time)
-            self.update(delta, self.total_time)
-            # print('tick=', delta, 'ms', '   fps=', 1000 / delta, '   objects=', len(self.scene.objects))
-            time.sleep(0.016)
+        # update world
+        self.scene.update_all(delta, self.total_time)
+        self.update(delta, self.total_time)
 
-            # draw world
-            self.scene.draw_all(self.g)
+        # print('tick=', delta, 'ms', '   fps=', 1000 / delta, '   objects=', len(self.scene.objects))
 
-            # compute next delta time
-            delta = (time.clock() - start) * 1000  # convert to ms
-            self.total_time += delta
+        # draw world
+        self.scene.draw_all(self.g)
 
-            # poll events
-            self.canvas.update_idletasks()
-            self.canvas.update()
+        # compute next delta time
+        self.total_time += delta
+
+        def do_loop():
+            self.loop()
+
+        self.canvas.after(int(self.frame_time * 1000), do_loop)
 
     def clean_up(self):
         pass
 
     def update(self, delta_time, total_time):
-        self.cube.position = Vec3(0, 0, math.sin(total_time * 0.005))
-        self.cube.rotation = Vec3(0, math.radians(total_time * 0.05), math.radians(10))
-        self.cube.scale = Vec3(0.4, math.fabs(math.sin(total_time * 0.004) * 0.4) + 0.2, 0.4)
+        g_rot = Vec3(0, math.radians(total_time * 16), math.radians(20))
+        self.cube.rotation = self.cb.rotation = g_rot
         self.cube.dirty_transform_matrix = True
+        self.cb.dirty_transform_matrix = True
 
     def load_scene(self):
         self.cube = CubeObject()
@@ -376,7 +461,18 @@ class Program:
         self.cube.rotation = Vec3(math.radians(1), 0, 0)
         self.cube.dirty_transform_matrix = True
 
-        self.scene.add_object(self.cube)
+        self.cb = CheckersBoard()
+        self.cb.scale = Vec3(0.8, 0.8, 0.8)
+
+        self.scene.add_object(self.cb)
+        # self.scene.add_object(self.cube)
+
+    def start_loop(self):
+        def do_loop():
+            self.loop()
+
+        self.canvas.after(int(self.frame_time * 1000), do_loop)
+        self.canvas.mainloop()
 
 
 # Program()
