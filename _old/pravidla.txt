@@ -1,0 +1,10 @@
+1. Pesiaci sa mozu hybat iba dopredu
+2. Pesiaci sa mozu hybat iba po diagonalach
+3. Ak pesiek preskoci nepriatelovu figurku, tak ju vyhodi
+3,5. Pesiak moze preskocit a vyhodit svoje figurky ak je friendly fire povoleny (v settings.json)
+4. Inak moze pesiak ist o najviac 1 policko dopradu
+5. Dvaja pesiaci nemozu stat na sebe
+6. Zacina biely (alebo podla start_game.json)
+7. Pesiaci aj damy mozu preskocit viac figurok ale iba v jednom smere (nemoze sa v strede skakania otocit) na jeden tah.
+8. Damy mozu skakat po diagonalach hocikolko a hocikam.
+9. Hra konci ked jeden z hracov pride o svoje figurky.

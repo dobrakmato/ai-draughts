@@ -180,7 +180,7 @@ class Camera:
         self.dirty_view_matrix = True
 
     def update(self, delta_time, total_time):
-        # self.view_matrix = Mat4.create_rotation(Vec3(0, 0, math.radians(90)))
+        self.view_matrix = Mat4.create_rotation(Vec3(0, 0, math.radians(90)))
         pass
 
 
@@ -272,6 +272,10 @@ class CheckersBoard(SceneObject):
         self.D = Vec3(1, 0, -1)
         self.tiles = 8
 
+        self.board = []
+        # for _ in range(1, 8):
+
+
         self.black_rects = []
 
         # perform 2d lerp
@@ -328,17 +332,42 @@ class Pawn(SceneObject):
     def __init__(self):
         SceneObject.__init__(self)
 
+        self.color = 'blue'
         self.size = 0.08
 
+        self.A = Vec3(-self.size, -self.size, self.size)
+        self.B = Vec3(self.size, -self.size, self.size)
+        self.C = Vec3(self.size, -self.size, -self.size)
+        self.D = Vec3(-self.size, -self.size, -self.size)
+        self.E = Vec3(-self.size, self.size, self.size)
+        self.F = Vec3(self.size, self.size, self.size)
+        self.G = Vec3(self.size, self.size, -self.size)
+        self.H = Vec3(-self.size, self.size, -self.size)
+
         self.combined_matrix = Mat4()
+
+    def draw(self, g):
+        # transform points
+        A = self.combined_matrix.mul_point(self.A)
+        B = self.combined_matrix.mul_point(self.B)
+        C = self.combined_matrix.mul_point(self.C)
+        D = self.combined_matrix.mul_point(self.D)
+        E = self.combined_matrix.mul_point(self.E)
+        F = self.combined_matrix.mul_point(self.F)
+        G = self.combined_matrix.mul_point(self.G)
+        H = self.combined_matrix.mul_point(self.H)
+
+        g.polygon(A, B, F, H, fill=self.color)
+        g.polygon(B, C, G, F, fill=self.color)
+        g.polygon(E, F, G, H, fill=self.color)
+        g.polygon(C, D, H, G, fill=self.color)
+        g.polygon(A, D, H, E, fill=self.color)
+        g.polygon(A, B, C, D, fill=self.color)
 
     def update(self, camera, delta_time, total_time):
         super().update(camera, delta_time, total_time)
 
         self.combined_matrix = camera.projection_matrix * camera.view_matrix * self.transform_matrix
-
-    def draw(self, g):
-        pass
 
 
 class Graphics:
@@ -450,7 +479,7 @@ class Program:
         pass
 
     def update(self, delta_time, total_time):
-        g_rot = Vec3(0, math.radians(total_time * 16), math.radians(20))
+        g_rot = Vec3(0, math.radians(0), math.radians(0))
         self.cube.rotation = self.cb.rotation = g_rot
         self.cube.dirty_transform_matrix = True
         self.cb.dirty_transform_matrix = True
