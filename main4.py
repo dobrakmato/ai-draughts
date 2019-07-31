@@ -13,7 +13,7 @@ class Player:
 
 
 class Players:
-    NONE, WHITE, BLACK = Player(0, 'None', 0), Player(1, 'White', 1), Player(2, 'Black', -1)
+    NONE, WHITE, BLACK = Player(0, 'None', 0), Player(1, 'Blue', 1), Player(2, 'Red', -1)
 
     @staticmethod
     def from_id(player_id: int):
@@ -76,8 +76,8 @@ class Skin:
 
 
 class Graphics:
-    def __init__(self, canvas: tkinter.Canvas):
-        self.skin = Skin()
+    def __init__(self, canvas: tkinter.Canvas, skin: Skin):
+        self.skin = skin
         self.canvas: tkinter.Canvas = canvas
 
 
@@ -238,8 +238,12 @@ class Pawn:
 
 
 class Draughts(Pawn):
-    def __init__(self, from_pawn: Pawn):
-        super().__init__(from_pawn.x, from_pawn.y, from_pawn.player, from_pawn.graphics)
+    def __init__(self, x, y, player, graphics):
+        super().__init__(x, y, player, graphics)
+
+    @classmethod
+    def from_pawn(cls, from_pawn: Pawn):
+        return cls(from_pawn.x, from_pawn.y, from_pawn.player, from_pawn.graphics)
 
     def __str__(self):
         return f'{self.player.name} Draughts at {self.x};{self.y}'
@@ -327,7 +331,7 @@ class MoveTransaction:
 
         # Promote pawn to draughts.
         if self.board.should_become_draught(self.pawn.x, self.pawn.y):
-            self.board.set_pawn_at(self.pawn.x, self.pawn.y, Draughts(self.pawn))
+            self.board.set_pawn_at(self.pawn.x, self.pawn.y, Draughts.from_pawn(self.pawn))
             self.pawn.die()
             self.pawn = None
 
@@ -376,9 +380,9 @@ class InfoboardGUI:
         self.graphics.canvas.itemconfig(self.current_player,
                                         text=f'Current player: {self.board.current_player.name}')
         self.graphics.canvas.itemconfig(self.black_score,
-                                        text=f'Black: {self.board.score_tracker.get_score(Players.BLACK)}')
+                                        text=f'{Players.BLACK.name}: {self.board.score_tracker.get_score(Players.BLACK)}')
         self.graphics.canvas.itemconfig(self.white_score,
-                                        text=f'White: {self.board.score_tracker.get_score(Players.WHITE)}')
+                                        text=f'{Players.WHITE.name}: {self.board.score_tracker.get_score(Players.WHITE)}')
         self.graphics.canvas.itemconfig(self.moves,
                                         text=f'Moves: {MoveTransaction.moves}')
 
@@ -388,7 +392,8 @@ class InfoboardGUI:
 
 
 class BlackAI:
-    def __init__(self, board, g: Graphics, me=Players.BLACK):
+    def __init__(self, board, g: Graphics, me=Players.BLACK, speed=10):
+        self.speed = speed
         self.me = me
         self.board = board
         self.graphics = g
@@ -427,7 +432,7 @@ class BlackAI:
             print('[AI] Best move:', move)
             self.play_move(pawn, move)
 
-        self.graphics.canvas.after(score * random.randint(10, 90), helper)
+        self.graphics.canvas.after(score * random.randint(self.speed, self.speed * 9), helper)
 
     def play_move(self, pawn, move):
         self.board.move_transaction = MoveTransaction(pawn, self.board)
@@ -448,7 +453,7 @@ class BlackAI:
 
 
 class Board:
-    def __init__(self, graphics, ai_enabled, white_ai_enabled, show_valid_moves):
+    def __init__(self, graphics, ai_enabled, white_ai_enabled, show_valid_moves, bot_speed):
         self.score_tracker = ScoreTracker()
         self.move_transaction: MoveTransaction = None
         self.pawns = [[None for x in range(8)] for y in range(8)]
@@ -456,8 +461,8 @@ class Board:
         self.graphics = graphics
         self.valid_moves_gui = ValidMovesGUI(self.graphics) if show_valid_moves else None
         self.gui = BoardGUI(self, self.graphics)
-        self.ai = BlackAI(self, self.graphics) if ai_enabled else None
-        self.ai2 = BlackAI(self, self.graphics, Players.WHITE) if white_ai_enabled else None
+        self.ai = BlackAI(self, self.graphics, speed=bot_speed) if ai_enabled else None
+        self.ai2 = BlackAI(self, self.graphics, Players.WHITE, speed=bot_speed) if white_ai_enabled else None
         self.infoboard_gui = InfoboardGUI(self, self.graphics)
         self.bind_events()
 
@@ -564,7 +569,10 @@ class Board:
             for y in range(8):
                 for x in range(8):
                     if doc['pawns'][y][x] != 0:
-                        self.pawns[x][y] = Pawn(x, y, Players.from_id(doc['pawns'][y][x]), self.graphics)
+                        if doc['pawns'][y][x] < 0:
+                            self.pawns[x][y] = Draughts(x, y, Players.from_id(abs(doc['pawns'][y][x])), self.graphics)
+                        else:
+                            self.pawns[x][y] = Pawn(x, y, Players.from_id(doc['pawns'][y][x]), self.graphics)
             print(f'Game loaded from {file_name}!')
 
     def save_savegame(self, file_name):
@@ -646,18 +654,34 @@ class Board:
 class Program:
     def __init__(self):
         # ------------- SETTINGS START ----------------
+
+        # Whether to enable AI for black player.
         black_ai_enabled = True
+
+        # Whether to enable AI for white player.
         white_ai_enabled = False
+
+        # Bot speed.
+        bot_speed = 10
+
+        # Whether to show valid moves.
         show_valid_moves = True
+
+        # File to load at start of new game.
+        new_game_load_file = 'default_savegame.json'
+
+        # Whether to use GIF graphics instead of PNG ones.
+        use_gif_instead_png = True
+
         # -------------- SETTINGS END -----------------
 
         c = tkinter.Canvas(width=768, height=511)
         c.configure(background='#744e30')
         c.pack()
-        custom_graphics = Graphics(c)
+        custom_graphics = Graphics(c, Skin(ext=('.gif' if use_gif_instead_png else '.png')))
 
-        b = Board(custom_graphics, black_ai_enabled, white_ai_enabled, show_valid_moves)
-        b.load_savegame('default_savegame.json')
+        b = Board(custom_graphics, black_ai_enabled, white_ai_enabled, show_valid_moves, bot_speed)
+        b.load_savegame(new_game_load_file)
         b.save_savegame('save.json')
         print(b)
 
